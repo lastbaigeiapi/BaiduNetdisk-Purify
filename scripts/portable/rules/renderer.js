@@ -3,6 +3,7 @@
 'use strict';
 const { MARK, } = require('./index');
 const { esc, ID, R } = require('../engine');
+const { videoFileCondition } = require('../video_preview');
 
 // ---- 7-17: ad related vuex mutations become no-ops ----------------------------------------------------------
 const AD = [
@@ -64,7 +65,7 @@ module.exports = {
       find: /imageViewerExist:"1"===[\w$]+(?:\(\))?\.\$getSystemParamById\([\w$]+(?:\(\))?\.[\w$]+\.APP_PARAM_ID_IMAGE_VIEWER_EXIST\)/,
       repl: 'imageViewerExist:' + MARK + '!1' },
 
-    { id: 'renderer.preview-download', legacy: [94], where: 'renderer.js', name: '精简: 预览总入口 = 下载后打开（其它窗口/列表）',
+    { id: 'renderer.preview-download', legacy: [94], where: 'renderer.js', name: '精简: 非视频预览 = 下载后打开（其它窗口/列表）',
       feature: 'previewStartTime',
       // keep the 2nd arg name (`t`) and the "unsupported type" branch constant (t.from!==X.Y) from the same method
       find: /preview\(e,t\)\{e\.previewStartTime=Date\.now\(\);(?=[^]{0,1200}?t\.from!==[\w$]+\.[\w$]+\?[\w$.(),]+\(\{type:"info",title:"百度网盘提示",message:"暂不支持此类型文件预览)/,
@@ -78,11 +79,12 @@ module.exports = {
         for (const x of text.slice(mod.start, i).matchAll(/\{app:([\w$]+),dialog:[\w$]+\}=/g)) app = x[1];
         if (!app) throw new Error('app binding not found');
         const store = storeRef(text, mod.start, modEnd, mod.req);
+        const guard = ctx.options.downloadVideos ? '' : '!' + videoFileCondition('e', 'e.path||__p') + '&&';
         // No module-local binding: the method body declares `let i=...` (shadowing the webpack require param `i`),
         // so resolve the store in a default parameter (evaluated outside the body scope).
         return 'preview(e,t' + store.param + '){' + MARK + 'try{var __p=e&&(e.server_path||e.path),__f=t&&t.from;' +
           'if(__p&&"/"===String(__p).charAt(0)&&!/^\\/_pcs_\\.(knowledge_subscribe|sharedir_receive)/.test(String(__p))&&!e.from_uk&&!e.fromUk&&!e.shareInfo&&!e.share_info&&!e.sender&&!e.fileUrl&&!e.isChat&&' +
-          `(!__f||(__f!==${fromConst}&&"conversation"!==__f))){var __d=!1,__go=function(){if(__d)return;__d=!0;` +
+          `${guard}(!__f||(__f!==${fromConst}&&"conversation"!==__f))){var __d=!1,__go=function(){if(__d)return;__d=!0;` +
           `${store.ref}.dispatch("downloading/addDownloadTask",[{md5:e.md5||"",size:e.size,is_dir:0,server_path:String(__p),from_manual:1,downloadAndEditSwitch:!0}])};` +
           `try{${app}.$getLocalPathFromDownloadHistory(String(__p),function(c,l){if(__d)return;` +
           `if(0===c&&l&&window.require&&window.require("fs").existsSync(l)){__d=!0;${app}.$openImageViewer('"'+l+'"');return}__go()})}catch(__e){}` +

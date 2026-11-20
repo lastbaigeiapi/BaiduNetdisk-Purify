@@ -73,7 +73,7 @@ function hasFeature(f, texts) {
 // Apply one rule to the (mutable) Map name->text. Returns { status, edits, detail }.
 //   status: 'ok' | 'n/a' | 'skip' | 'fail'
 //   edits:  [{ file, index, find, repl }]   (index = position in the text BEFORE this edit)
-function applyRule(rule, texts) {
+function applyRule(rule, texts, options = {}) {
   const names = [...texts.keys()];
   if (rule.feature !== undefined && !hasFeature(rule.feature, texts)) return { status: 'n/a', edits: [], detail: 'feature absent' };
   const cands = candidates(rule, names, texts);
@@ -110,7 +110,7 @@ function applyRule(rule, texts) {
       if (countLiteral(s, find) !== 1) return bad(`matched text is not unique as a literal in ${f}`);
       let repl;
       if (typeof rule.repl === 'function') {
-        const ctx = { text: s, file: f, index: m.index };
+        const ctx = { text: s, file: f, index: m.index, options };
         try { repl = rule.repl.apply(ctx, [...m, ctx]); } catch (e) { return bad(`repl threw in ${f}: ${e.message}`); }
       } else repl = rule.repl;
       if (typeof repl !== 'string') return bad('repl did not return a string');
@@ -133,12 +133,12 @@ function orderKey(r) { return r.legacy && r.legacy.length ? Math.min(...r.legacy
 function sortRules(rules) { return rules.slice().sort((a, b) => orderKey(a) - orderKey(b) || natural(a.id, b.id)); }
 
 // Resolve all rules in order. Returns { texts, results: [{rule, status, edits, detail}] }
-function resolveAll(rules, pristine) {
+function resolveAll(rules, pristine, options) {
   const texts = new Map(pristine);
   const results = [];
   for (const rule of sortRules(rules)) {
     let r;
-    try { r = applyRule(rule, texts); } catch (e) { r = { status: 'fail', edits: [], detail: 'exception: ' + e.message }; }
+    try { r = applyRule(rule, texts, options); } catch (e) { r = { status: 'fail', edits: [], detail: 'exception: ' + e.message }; }
     results.push(Object.assign({ rule }, r));
   }
   return { texts, results };

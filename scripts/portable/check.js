@@ -3,7 +3,7 @@
 //   <dir>/<version>/core/  (extracted core.asar)  or  <dir>/<version>/module/BrowserEngine/resources/core.asar
 // Reports per build: ok / n/a / skip / FAIL per rule, JS syntax of every modified file.
 // On 8.9.7.101 additionally: every rule, applied ALONE to the pristine files, must produce exactly the same file
-// contents as its legacy 1.x rules (patchset_def.js) applied alone  ->  "regress".
+// contents as its legacy 1.x rules (patchset_def.js) applied alone, using the video-download mode.
 // Without --group: also checks that every legacy index is covered by a rule or listed in a group's `dropped`.
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -54,7 +54,7 @@ for (const v of versions) {
       if (!rule.legacy || !rule.legacy.length) continue;
       const oldT = new Map(pristine), newT = new Map(pristine);
       const okOld = rule.legacy.slice().sort((a, b) => a - b).every(i => applyLegacy(i, oldT));
-      const res = E.applyRule(rule, newT);
+      const res = E.applyRule(rule, newT, { downloadVideos: true });
       const files = new Set([...oldT.keys()].filter(f => oldT.get(f) !== pristine.get(f) || newT.get(f) !== pristine.get(f)));
       const eq = okOld && res.status === 'ok' && [...files].every(f => oldT.get(f) === newT.get(f));
       if (eq) same++;

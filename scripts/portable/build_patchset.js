@@ -1,18 +1,18 @@
 // Resolve the portable rules against ONE build and write its exact patchset.json (format 1, literal edits only),
 // which the PowerShell patcher applies unchanged. Any failing rule aborts (no partial scheme).
-// Usage: node scripts/portable/build_patchset.js <core.asar | extracted dir> <tools> <out.json> <originalSha256 | -> [expectedOutSha256 | -] [label]
+// Usage: node scripts/portable/build_patchset.js <core.asar | extracted dir> <tools> <out.json> <originalSha256 | -> [expectedOutSha256 | -] [label] [--download-videos]
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const E = require('./engine');
 const { loadGroups, NEW_FILES, MARK } = require('./rules');
-const [SRC, TOOLS, OUT, ORIG, EXPECTED, LABEL] = process.argv.slice(2);
+const [SRC, TOOLS, OUT, ORIG, EXPECTED, LABEL, VIDEO_MODE] = process.argv.slice(2);
 if (!SRC || !TOOLS || !OUT || !ORIG) { console.error('usage: build_patchset.js <core> <tools> <out.json> <origSha|-> [expectedSha|-] [label]'); process.exit(2); }
 const val = x => (x && x !== '-' ? x.toLowerCase() : '');
 
 const pristine = E.loadCore(SRC, TOOLS);
 if ((pristine.get('main.js') || '').includes(MARK)) { console.error('this core.asar is already patched; use the original'); process.exit(3); }
 const rules = loadGroups().flatMap(g => g.rules);
-const { texts, results } = E.resolveAll(rules, pristine);
+const { texts, results } = E.resolveAll(rules, pristine, { downloadVideos: VIDEO_MODE === '--download-videos' });
 
 const failed = results.filter(r => r.status === 'fail');
 for (const r of failed) console.error(`FAIL ${r.rule.id}: ${r.detail}`);

@@ -12,7 +12,7 @@ namespace Purify
         private const string HeaderPrefix = "{\"files\":{";
         private const StringComparison Ordinal = StringComparison.Ordinal;
 
-        internal static void Build(string original, string output, Scheme scheme)
+        internal static void Build(string original, string output, PatchSet rules, Dictionary<string, byte[]> files)
         {
             using (var source = File.OpenRead(original))
             using (var reader = new BinaryReader(source))
@@ -31,7 +31,7 @@ namespace Purify
                 var entries = Formats.Decode<AsarHeader>(headerBytes).files;
                 var order = new List<string>();
                 var replacements = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (var rule in scheme.Rules.patches)
+                foreach (var rule in rules.patches)
                 {
                     string input;
                     if (!replacements.TryGetValue(rule.file, out input))
@@ -44,7 +44,7 @@ namespace Purify
                             throw new InvalidDataException("方案中的文件在 core.asar 中不存在：" + rule.file);
                         source.Position = dataStart + offset;
                         input = Formats.Utf8.GetString(Read(reader, entry.size));
-                        if (rule.file == "main.js" && input.Contains(scheme.Rules.mark))
+                        if (rule.file == "main.js" && input.Contains(rules.mark))
                             throw new InvalidDataException("输入文件已有补丁标记，请使用原版备份。");
                         order.Add(rule.file);
                     }
@@ -62,11 +62,11 @@ namespace Purify
                 }
                 string inserted = "";
                 var names = new HashSet<string>(StringComparer.Ordinal);
-                foreach (string name in scheme.Rules.newFiles)
+                foreach (string name in rules.newFiles)
                 {
                     byte[] bytes;
                     if (!SchemeSource.IsFileName(name) || !names.Add(name) || entries.ContainsKey(name) ||
-                        !scheme.Files.TryGetValue("files/" + name, out bytes))
+                        !files.TryGetValue("files/" + name, out bytes))
                         throw new InvalidDataException("新增文件在方案中无效：" + name);
                     Formats.Utf8.GetString(bytes);
                     inserted += "\"" + name + "\":" + Entry(bytes, dataLength) + ",";
@@ -96,7 +96,7 @@ namespace Purify
                     target.Flush(true);
                 }
             }
-            if (Formats.Sha(output) != scheme.Entry.outputSha256)
+            if (Formats.Sha(output) != rules.expectedOutputSha256)
                 throw new InvalidDataException("补丁输出与签名索引中的 SHA-256 不一致。");
         }
 

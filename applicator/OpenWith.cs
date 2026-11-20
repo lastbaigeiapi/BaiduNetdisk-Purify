@@ -58,9 +58,9 @@ namespace Purify
             }
         }
 
-        internal static void Restore(ClientState state)
+        internal static void Restore(ClientState state, Manifest record)
         {
-            if (!state.Record.registryBackedUp)
+            if (!record.registryBackedUp)
                 return;
             foreach (string key in Keys)
             {
@@ -68,16 +68,23 @@ namespace Purify
                 if (File.Exists(backup))
                     Reg("import \"" + backup + "\"");
             }
-            var values = state.Record.registeredAppValues;
-            if (values == null || values.Count == 0)
-                return;
-            using (var registrations = Registry.CurrentUser.CreateSubKey(Apps))
-                foreach (string name in Names)
-                {
-                    string value;
-                    if (values.TryGetValue(name, out value) && registrations.GetValue(name) == null)
-                        registrations.SetValue(name, value, RegistryValueKind.String);
-                }
+            var values = record.registeredAppValues;
+            if (values != null && values.Count != 0)
+                using (var registrations = Registry.CurrentUser.CreateSubKey(Apps))
+                    foreach (string name in Names)
+                    {
+                        string value;
+                        if (values.TryGetValue(name, out value) && registrations.GetValue(name) == null)
+                            registrations.SetValue(name, value, RegistryValueKind.String);
+                    }
+            foreach (string key in Keys)
+            {
+                string backup = BackupFor(state.Client, key);
+                if (File.Exists(backup)) File.Delete(backup);
+            }
+            record.registryBackedUp = false;
+            record.registeredAppValues = null;
+            state.Save(record);
         }
 
         private static string BackupFor(ClientDirectory client, string key)

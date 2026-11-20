@@ -10,7 +10,8 @@ param(
   [Parameter(Mandatory = $true)][string]$CoreAsar,
   [string]$OutAsar,
   [Parameter(Mandatory = $true)][string]$PatchDir,
-  [switch]$CheckOnly
+  [switch]$CheckOnly,
+  [ValidateSet('patchset.json', 'video-download.json')][string]$PatchSetName = 'patchset.json'
 )
 # A child of PowerShell 7 inherits its PSModulePath, which breaks module autoloading in Windows PowerShell 5.1
 # (cmdlets such as Get-FileHash / Register-ScheduledTask then appear to be missing). Reset to the 5.1 defaults.
@@ -47,7 +48,7 @@ function Get-OrdinalCount([string]$S, [string]$F) {
 }
 
 # ---------------- load patchset ----------------
-$psPath = Join-Path $PatchDir 'patchset.json'
+$psPath = Join-Path $PatchDir $PatchSetName
 $set = [System.IO.File]::ReadAllText($psPath, $Utf8) | ConvertFrom-Json
 if ($set.format -ne 1) { throw "unsupported patchset format: $($set.format)" }
 $MARK = [string]$set.mark

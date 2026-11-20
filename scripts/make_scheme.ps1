@@ -56,13 +56,23 @@ try {
   }
   Copy-Item -LiteralPath $Components -Destination (Join-Path $dir 'components.json')
 
+  $variants = @('patchset.json')
+  if (-not $Def) {
+    $variants += 'video-download.json'
+    & node scripts\portable\build_patchset.js $CoreAsar $Tools (Join-Path $dir 'video-download.json') $orig '-' $Name --download-videos
+    if ($LASTEXITCODE) { throw 'video download patchset generation failed' }
+  }
   $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-  & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'installer\payload\nd_patcher.ps1') -CoreAsar $CoreAsar -OutAsar $tmp -PatchDir $dir
-  if ($LASTEXITCODE -or -not (Test-Path -LiteralPath $tmp)) { throw 'nd_patcher failed: the patch definition does not apply to this core.asar' }
-  $out = Sha $tmp
-  [IO.File]::Delete($tmp)
-  $set.expectedOutputSha256 = $out
-  [IO.File]::WriteAllText($patchset, (ConvertTo-Json -InputObject $set -Depth 16), [Text.UTF8Encoding]::new($false))
+  foreach ($variant in $variants) {
+    & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'installer\payload\nd_patcher.ps1') -CoreAsar $CoreAsar -OutAsar $tmp -PatchDir $dir -PatchSetName $variant
+    if ($LASTEXITCODE -or -not (Test-Path -LiteralPath $tmp)) { throw "nd_patcher failed for $variant" }
+    $variantPath = Join-Path $dir $variant
+    $definition = [IO.File]::ReadAllText($variantPath) | ConvertFrom-Json
+    $definition.expectedOutputSha256 = Sha $tmp
+    [IO.File]::Delete($tmp)
+    [IO.File]::WriteAllText($variantPath, (ConvertTo-Json -InputObject $definition -Depth 16), [Text.UTF8Encoding]::new($false))
+    Write-Output "scheme $Name  $variant output $($definition.expectedOutputSha256)"
+  }
   if (Test-Path -LiteralPath $dest -PathType Container) {
     $existing = Get-Item -LiteralPath $dest -Force
     if ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "refusing to replace a linked scheme directory: $dest" }
@@ -77,7 +87,6 @@ try {
     throw
   }
   Remove-BuildDirectory $previous '.previous-'
-  Write-Output "scheme $Name  patched output $out"
 } finally {
   Remove-BuildDirectory $dir '.build-'
 }

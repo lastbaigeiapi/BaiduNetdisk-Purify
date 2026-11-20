@@ -1,8 +1,9 @@
 // File list / transfer list odds and ends: row-hover icons (知识库 / AI总结), 「添加AI下载任务」, 云打印,
-// 智能看图 new previewer, double-click = download then open.
+// 智能看图 new previewer, non-video double-click = download then open.
 'use strict';
 const { MARK } = require('./index');
 const { ID, IMPORT } = require('../engine');
+const { videoFileCondition } = require('../video_preview');
 
 // Start at a bare identifier so long base64 runs are scanned once, without trying each suffix.
 const RECEIVER = `(?<![\\w$.])${ID}`;
@@ -58,17 +59,18 @@ module.exports = {
     // ---- 93: 双击文件 = 下载后打开（openOrPreview 的 "case N:" 分支，主窗口） ---------------------------
     // Captures (all from THIS build): case number, app module expr (G | t()), file var (s), callback params, fs alias,
     // `this` alias of the component (i) and the regenerator context (n) taken from the following limitFileSize guard.
-    { id: 'filelist_misc.dblclick-download-open', legacy: [93], name: '精简: 双击文件 = 下载后打开（主窗口）',
+    { id: 'filelist_misc.dblclick-download-open', legacy: [93], name: '精简: 双击非视频文件 = 下载后打开（主窗口）',
       feature: '正在打开本地已下载文件',
       find: new RegExp(
         `case (\\d+):if\\(navigator\\.onLine\\|\\|(${ID}(?:\\(\\))?)\\.app\\.\\$networkOnline\\|\\|` +
         `(?=\\2\\.app\\.\\$getLocalPathFromDownloadHistory\\((${ID})\\.path,\\(?function\\((${ID}),(${ID})\\)\\{if\\(0===\\4&&\\5&&(${ID})\\.existsSync\\(\\5\\)\\)return (${ID})\\.\\$toast\\("正在打开本地已下载文件"` +
         `[\\s\\S]{0,400}?!\\7\\.limitFileSize\\(\\3\\)\\)\\{(${ID})\\.next=)`),
       mode: 'one',
-      repl: function (m, num, app, f, e, t, fsa, self, rg) {
+      repl: function (m, num, app, f, e, t, fsa, self, rg, ctx) {
         const rest = m.slice(`case ${num}:`.length);
+        const guard = ctx.options.downloadVideos ? '' : '&&!' + videoFileCondition(f, f + '.path');
         return `case ${num}:` + MARK +
-          `if(${f}.path&&"/"===${f}.path.charAt(0)&&!/^\\/_pcs_\\.(knowledge_subscribe|sharedir_receive)/.test(${f}.path)){(function(){var __d=!1,__go=function(){if(__d)return;__d=!0;${self}.addDownloadTask([{md5:${f}.md5||"",size:${f}.size,is_dir:0,server_path:${f}.path,from_manual:1,downloadAndEditSwitch:!0}])};try{${app}.app.$getLocalPathFromDownloadHistory(${f}.path,function(${e},${t}){if(__d)return;if(0===${e}&&${t}&&${fsa}.existsSync(${t})){__d=!0;${app}.app.$openImageViewer('"'+${t}+'"');return}__go()})}catch(__e){}setTimeout(__go,1500)})();return ${rg}.abrupt("return")}` +
+          `if(${f}.path&&"/"===${f}.path.charAt(0)&&!/^\\/_pcs_\\.(knowledge_subscribe|sharedir_receive)/.test(${f}.path)${guard}){(function(){var __d=!1,__go=function(){if(__d)return;__d=!0;${self}.addDownloadTask([{md5:${f}.md5||"",size:${f}.size,is_dir:0,server_path:${f}.path,from_manual:1,downloadAndEditSwitch:!0}])};try{${app}.app.$getLocalPathFromDownloadHistory(${f}.path,function(${e},${t}){if(__d)return;if(0===${e}&&${t}&&${fsa}.existsSync(${t})){__d=!0;${app}.app.$openImageViewer('"'+${t}+'"');return}__go()})}catch(__e){}setTimeout(__go,1500)})();return ${rg}.abrupt("return")}` +
           rest;
       } },
   ],
